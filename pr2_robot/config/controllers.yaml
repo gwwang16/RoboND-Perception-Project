@@ -25,9 +25,9 @@ pr2:
       constraints:
         goal_time: 3.0
         right_right_gripper_finger_joint:
-          goal: 0.02
+          goal: 0.002
         right_left_gripper_finger_joint:
-          goal: 0.02
+          goal: 0.002
 
     left_gripper_controller:
       type: "effort_controllers/JointTrajectoryController"

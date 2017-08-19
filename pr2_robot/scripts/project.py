@@ -118,7 +118,7 @@ def pcl_callback(pcl_msg):
     # Set tolerances for distance threshold
     # as well as minimum and maximum cluster size (in points)
     ec.set_ClusterTolerance(0.01)
-    ec.set_MinClusterSize(200)
+    ec.set_MinClusterSize(100)
     ec.set_MaxClusterSize(3000)
     # Search the k-d tree for clusters
     ec.set_SearchMethod(tree)
@@ -129,7 +129,6 @@ def pcl_callback(pcl_msg):
     # Assign a color corresponding to each segmented object in scene
     cluster_color = get_color_list(len(cluster_indices))
     color_cluster_point_list = []
-
     for j, indices in enumerate(cluster_indices):
         for i, indice in enumerate(indices):
             color_cluster_point_list.append([white_cloud[indice][0],
@@ -171,7 +170,23 @@ def pcl_callback(pcl_msg):
         chists = compute_color_histograms(ros_cluster, using_hsv=True)
         normals = get_normals(ros_cluster)
         nhists = compute_normal_histograms(normals)
-        feature = np.concatenate((chists, nhists))
+        feature = np.concatenate((chists, nhists[:1]))
+
+        # Check shapes and values of normals 
+        # norm_x_vals = []
+        # norm_y_vals = []
+        # norm_z_vals = []
+        # for norm_component in pc2.read_points(normals, field_names = ('normal_x', 'normal_y', 'normal_z'),
+        #                                   skip_nans=True):
+        #     norm_x_vals.append(norm_component[0])
+        #     norm_y_vals.append(norm_component[1])
+        #     norm_z_vals.append(norm_component[2])
+        # print("mean:")
+        # print(np.mean(norm_x_vals), np.mean(norm_y_vals), np.mean(norm_z_vals))
+        # print("shape:")
+        # print(np.shape(norm_x_vals), np.shape(norm_y_vals), np.shape(norm_z_vals))
+        # print(np.min(norm_x_vals), np.min(norm_y_vals), np.min(norm_z_vals))
+        # print(np.max(norm_x_vals), np.max(norm_y_vals), np.max(norm_z_vals))
 
         # Make the prediction
         prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
@@ -221,7 +236,7 @@ def pr2_mover(object_list):
     pick_pose = Pose()
     place_pose = Pose()
 
-    test_scene_num.data = 2    
+    test_scene_num.data = 3    
 
     # Read yaml parameters
     object_list_param = rospy.get_param('/object_list')
@@ -268,17 +283,17 @@ def pr2_mover(object_list):
         dict_list.append(yaml_dict)
 
         # Wait for 'pick_place_routine' service to come up
-        rospy.wait_for_service('pick_place_routine')
+        # rospy.wait_for_service('pick_place_routine')
 
-        try:
-            pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+        # try:
+        #     pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
 
-            # Insert message variables to be sent as a service request   
-            resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-            print ("Response: ",resp.success)
+        #     # Insert message variables to be sent as a service request   
+        #     resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
+        #     print ("Response: ",resp.success)
 
-        except rospy.ServiceException, e:
-            print "Service call failed: %s"%e
+        # except rospy.ServiceException, e:
+        #     print "Service call failed: %s"%e
 
     # Output request parameters into output yaml file  
     yaml_filename = 'output_' + str(test_scene_num.data) + '.yaml'
