@@ -139,21 +139,19 @@ def pcl_callback(pcl_msg):
     cluster_cloud = pcl.PointCloud_PointXYZRGB()
     cluster_cloud.from_list(color_cluster_point_list)
 
-    # Create collision point
-    collision_point = cloud_table
-    # TODO: add reminding objects into collision map!!
-
     # Convert PCL data to ROS messages
     ros_pcl_objects = pcl_to_ros(cloud_objects)
     ros_pcl_table = pcl_to_ros(cloud_table)
     ros_cluster_cloud = pcl_to_ros(cluster_cloud)
-    ros_collision_point = pcl_to_ros(collision_point)
 
     # Publish ROS messages
     pcl_objects_pub.publish(ros_pcl_objects)
     pcl_table_pub.publish(ros_pcl_table)
     pcl_cluster_pub.publish(ros_cluster_cloud)
-    collision_point_pub.publish(ros_collision_point)
+
+    # Create collision point
+    collision_point = {}
+    collision_point["table"] = cloud_table.to_array()
 
     # Exercise-3 TODOs:
 
@@ -172,22 +170,6 @@ def pcl_callback(pcl_msg):
         nhists = compute_normal_histograms(normals)
         feature = np.concatenate((chists, nhists[:1]))
 
-        # Check shapes and values of normals 
-        # norm_x_vals = []
-        # norm_y_vals = []
-        # norm_z_vals = []
-        # for norm_component in pc2.read_points(normals, field_names = ('normal_x', 'normal_y', 'normal_z'),
-        #                                   skip_nans=True):
-        #     norm_x_vals.append(norm_component[0])
-        #     norm_y_vals.append(norm_component[1])
-        #     norm_z_vals.append(norm_component[2])
-        # print("mean:")
-        # print(np.mean(norm_x_vals), np.mean(norm_y_vals), np.mean(norm_z_vals))
-        # print("shape:")
-        # print(np.shape(norm_x_vals), np.shape(norm_y_vals), np.shape(norm_z_vals))
-        # print(np.min(norm_x_vals), np.min(norm_y_vals), np.min(norm_z_vals))
-        # print(np.max(norm_x_vals), np.max(norm_y_vals), np.max(norm_z_vals))
-
         # Make the prediction
         prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
         label = encoder.inverse_transform(prediction)[0]
@@ -203,6 +185,8 @@ def pcl_callback(pcl_msg):
         do.label = label
         do.cloud = ros_cluster
         detected_objects.append(do)
+        # Add the detected object to the collision map
+        collision_point[label] = pcl_cluster.to_array()
 
     rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
 
@@ -214,12 +198,12 @@ def pcl_callback(pcl_msg):
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        pr2_mover(detected_objects)
+        pr2_mover(detected_objects, collision_point)
     except rospy.ROSInterruptException:
         pass
 
 
-def pr2_mover(object_list):
+def pr2_mover(object_list, collision_point=None):
     '''function to load parameters and request PickPlace service'''
     # Initialize variables
     dict_list = []
@@ -282,18 +266,33 @@ def pr2_mover(object_list):
         yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
         dict_list.append(yaml_dict)
 
+
+        # Delete the target clound from collision map
+        print("Target now: ", target.label)
+        del collision_point[target.label]
+
+        # Creating collision map
+        points_list = np.empty((0,4), float)
+        for index, target_pts in collision_point.iteritems():
+            points_list = np.append(points_list, target_pts[:,:4], axis=0)
+
+        collision_cloud = pcl.PointCloud_PointXYZRGB()
+        collision_cloud.from_list(np.ndarray.tolist(points_list))
+        collision_point_pub.publish(pcl_to_ros(collision_cloud))
+
+
         # Wait for 'pick_place_routine' service to come up
-        # rospy.wait_for_service('pick_place_routine')
+        rospy.wait_for_service('pick_place_routine')
 
-        # try:
-        #     pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+        try:
+            pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
 
-        #     # Insert message variables to be sent as a service request   
-        #     resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-        #     print ("Response: ",resp.success)
+            # Insert message variables to be sent as a service request   
+            resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
+            print ("Response: ",resp.success)
 
-        # except rospy.ServiceException, e:
-        #     print "Service call failed: %s"%e
+        except rospy.ServiceException, e:
+            print "Service call failed: %s"%e
 
     # Output request parameters into output yaml file  
     yaml_filename = 'output_' + str(test_scene_num.data) + '.yaml'
