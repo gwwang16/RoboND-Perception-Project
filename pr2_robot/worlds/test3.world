@@ -808,13 +808,16 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <friction>
-              <ode mu="1.0" mu2="1.0" fdir1="0 0 0" slip1="0" slip2="0"/>
-            </friction>
-            <bounce restitution_coefficient="0" threshold="1e+6"/>
             <contact>
-              <ode soft_cfm="0" soft_erp="0.2" kp="1e+10" kd="1" max_vel="1.0" min_depth="1e-4"/>
+              <ode/>
             </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
           </surface>
         </collision>
         <self_collide>0</self_collide>
@@ -860,13 +863,16 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <friction>
-              <ode mu="1.0" mu2="1.0" fdir1="0 0 0" slip1="0" slip2="0"/>
-            </friction>
-            <bounce restitution_coefficient="0" threshold="1e+6"/>
             <contact>
-              <ode soft_cfm="0" soft_erp="0.2" kp="1e+10" kd="1" max_vel="1.0" min_depth="1e-4"/>
+              <ode/>
             </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
           </surface>
         </collision>
         <self_collide>0</self_collide>
@@ -912,13 +918,16 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <friction>
-              <ode mu="1.0" mu2="1.0" fdir1="0 0 0" slip1="0" slip2="0"/>
-            </friction>
-            <bounce restitution_coefficient="0" threshold="1e+6"/>
             <contact>
-              <ode soft_cfm="0" soft_erp="0.2" kp="1e+10" kd="1" max_vel="1.0" min_depth="1e-4"/>
+              <ode/>
             </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
           </surface>
         </collision>
         <self_collide>0</self_collide>
@@ -964,13 +973,16 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <friction>
-              <ode mu="1.0" mu2="1.0" fdir1="0 0 0" slip1="0" slip2="0"/>
-            </friction>
-            <bounce restitution_coefficient="0" threshold="1e+6"/>
             <contact>
-              <ode soft_cfm="0" soft_erp="0.2" kp="1e+10" kd="1" max_vel="1.0" min_depth="1e-4"/>
+              <ode/>
             </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
           </surface>
         </collision>
         <self_collide>0</self_collide>
@@ -1016,13 +1028,16 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <friction>
-              <ode mu="1.0" mu2="1.0" fdir1="0 0 0" slip1="0" slip2="0"/>
-            </friction>
-            <bounce restitution_coefficient="0" threshold="1e+6"/>
             <contact>
-              <ode soft_cfm="0" soft_erp="0.2" kp="1e+10" kd="1" max_vel="1.0" min_depth="1e-4"/>
+              <ode/>
             </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
           </surface>
         </collision>
         <self_collide>0</self_collide>

@@ -220,7 +220,7 @@ def pr2_mover(object_list, collision_point=None):
     pick_pose = Pose()
     place_pose = Pose()
 
-    test_scene_num.data = 3    
+    test_scene_num.data = 1    
 
     # Read yaml parameters
     object_list_param = rospy.get_param('/object_list')
@@ -262,7 +262,7 @@ def pr2_mover(object_list, collision_point=None):
 
 
         # Delete the target clound from collision map
-        print("Target now: ", target.label)
+        
         del collision_point[target.label]
 
         # Creating collision map
@@ -276,17 +276,18 @@ def pr2_mover(object_list, collision_point=None):
 
 
         # Wait for 'pick_place_routine' service to come up
-        rospy.wait_for_service('pick_place_routine')
+        # print("Target now: ", target.label)
+        # rospy.wait_for_service('pick_place_routine')
 
-        try:
-            pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+        # try:
+        #     pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
 
-            # Insert message variables to be sent as a service request   
-            resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-            print ("Response: ",resp.success)
+        #     # Insert message variables to be sent as a service request   
+        #     resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
+        #     print ("Response: ",resp.success)
 
-        except rospy.ServiceException, e:
-            print "Service call failed: %s"%e
+        # except rospy.ServiceException, e:
+        #     print "Service call failed: %s"%e
 
     # Output request parameters into output yaml file  
     yaml_filename = 'output_' + str(test_scene_num.data) + '.yaml'

@@ -160,43 +160,42 @@ def pcl_filtering(pcl_msg):
     detected_objects_all = []
     detected_objects_labels = []
     detected_objects = []
-    if rotation_state:
-        for index, pts_list in enumerate(cluster_indices):
-            # Grab the points for the cluster
-            pcl_cluster = cloud_objects.extract(pts_list)
+    
+    for index, pts_list in enumerate(cluster_indices):
+        # Grab the points for the cluster
+        pcl_cluster = cloud_objects.extract(pts_list)
 
-            ros_cluster = pcl_to_ros(pcl_cluster)
+        ros_cluster = pcl_to_ros(pcl_cluster)
 
-            # Compute the associated feature vector
-            chists = compute_color_histograms(ros_cluster, using_hsv=True)
-            normals = get_normals(ros_cluster)
-            nhists = compute_normal_histograms(normals)
-            feature = np.concatenate((chists, nhists[:1]))
+        # Compute the associated feature vector
+        chists = compute_color_histograms(ros_cluster, using_hsv=True)
+        normals = get_normals(ros_cluster)
+        nhists = compute_normal_histograms(normals)
+        feature = np.concatenate((chists, nhists[:1]))
 
-            # Make the prediction
-            prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
-            label = encoder.inverse_transform(prediction)[0]
-            detected_objects_labels.append(label)
+        # Make the prediction
+        prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
+        label = encoder.inverse_transform(prediction)[0]
+        detected_objects_labels.append(label)
 
-            # Publish a label into RViz
-            label_pos = list(white_cloud[pts_list[0]])
-            label_pos[2] += .4
-            object_markers_pub.publish(make_label(label,label_pos, index))
+        # Publish a label into RViz
+        label_pos = list(white_cloud[pts_list[0]])
+        label_pos[2] += .4
+        object_markers_pub.publish(make_label(label,label_pos, index))
 
-            # Add the detected object to the list of detected objects.
-            do = DetectedObject()
-            do.label = label
-            do.cloud = ros_cluster
-            detected_objects.append(do)
-            # Add the detected object to the collision map
-            # collision_point[label] = pcl_cluster.to_array()
+        # Add the detected object to the list of detected objects.
+        do = DetectedObject()
+        do.label = label
+        do.cloud = ros_cluster
+        detected_objects.append(do)
+        # Add the detected object to the collision map
+        # collision_point[label] = pcl_cluster.to_array()
 
-
-            if not any(item.label == label for item in detected_objects_all):
-            # for x in detected_objects_all:
-            #     if label in x.label:
-                detected_objects_all.append(do)
-                detected_objects_labels_all.append(label)
+        if not any(item.label == label for item in detected_objects_all):
+        # for x in detected_objects_all:
+        #     if label in x.label:
+            detected_objects_all.append(do)
+            detected_objects_labels_all.append(label)
 
     rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
     rospy.loginfo('All detected {} objects: {}'.format(len(detected_objects_labels_all), detected_objects_labels_all))
@@ -209,7 +208,6 @@ def pcl_filtering(pcl_msg):
 
 def pr2_mov(rad):
     '''move pr2 world joint to desired angle (rad)'''
-
     rate = rospy.Rate(50) # 50hz
     world_joint_pub.publish(rad)
     rate.sleep()
@@ -259,7 +257,8 @@ def pcl_callback(pcl_msg):
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        pr2_mover(detected_objects, collision_point)
+        if len(detected_objects) > 0:
+            pr2_mover(detected_objects, collision_point)
     except rospy.ROSInterruptException:
         pass
 
@@ -267,6 +266,8 @@ def pcl_callback(pcl_msg):
 def pr2_mover(object_list, collision_point=None):
     '''function to load parameters and request PickPlace service'''
     # Initialize variables
+    global use_collision_map
+
     dict_list = []
     labels = []
     centroids = []
@@ -281,13 +282,14 @@ def pr2_mover(object_list, collision_point=None):
     pick_pose = Pose()
     place_pose = Pose()
 
-    test_scene_num.data = 4    
+    test_scene_num.data = 3    
 
     # Read yaml parameters
     object_list_param = rospy.get_param('/object_list')
     dropbox_param = rospy.get_param('/dropbox')   
 
     # Loop through the pick list
+    target_count = 0
     for target in object_list:
         
         labels.append(target.label)
@@ -308,8 +310,8 @@ def pr2_mover(object_list, collision_point=None):
             if dropbox_param[ii]['group'] == object_group:
                 arm_name.data = dropbox_param[ii]['name']
                 dropbox_position = dropbox_param[ii]['position']
-                dropbox_x = dropbox_position[0]
-                dropbox_y = dropbox_position[1]
+                dropbox_x = -0.1 #dropbox_position[0]
+                dropbox_y = dropbox_position[1] - 0.1 + target_count*0.04
                 dropbox_z = dropbox_position[2]
                 place_pose.position.x = np.float(dropbox_x)
                 place_pose.position.y = np.float(dropbox_y)
@@ -318,19 +320,21 @@ def pr2_mover(object_list, collision_point=None):
         # Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
         yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
         dict_list.append(yaml_dict)
+        target_count += 1
 
-        if False:
-            # Delete the target clound from collision map
-            del collision_point[target.label]
+        # if use_collision_map:
+        #     # Delete the target clound from collision map
+        #     del collision_point[target.label]
 
-            # Creating collision map
-            points_list = np.empty((0,4), float)
-            for index, target_pts in collision_point.iteritems():
-                points_list = np.append(points_list, target_pts[:,:4], axis=0)
+        #     # Creating collision map
+        #     points_list = np.empty((0,4), float)
+        #     for index, target_pts in collision_point.iteritems():
+        #         points_list = np.append(points_list, target_pts[:,:4], axis=0)
 
-            collision_cloud = pcl.PointCloud_PointXYZRGB()
-            collision_cloud.from_list(np.ndarray.tolist(points_list))
-            collision_point_pub.publish(pcl_to_ros(collision_cloud))
+        #     collision_cloud = pcl.PointCloud_PointXYZRGB()
+        #     collision_cloud.from_list(np.ndarray.tolist(points_list))
+        #     collision_point_pub.publish(pcl_to_ros(collision_cloud))
+        #     rospy.sleep(2)
 
 
         # Wait for 'pick_place_routine' service to come up
@@ -352,15 +356,16 @@ def pr2_mover(object_list, collision_point=None):
     if not os.path.exists(yaml_filename):
         send_to_yaml(yaml_filename, dict_list)
         print(yaml_filename + "has been saved.")
-    else:
-        print(yaml_filename + "has been existed.")
+    # else:
+    #     print(yaml_filename + "has been existed.")
 
 
 if __name__ == '__main__':
-
+    # Initial global variables
     rotation_state = True
     world_joint_state = 0
     rot_dir = 'left'
+    use_collision_map = True
 
     # ROS node initialization
     rospy.init_node('perception_project', anonymous=True)
