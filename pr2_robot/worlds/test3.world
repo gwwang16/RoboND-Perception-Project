@@ -718,58 +718,6 @@
       <allow_auto_disable>1</allow_auto_disable>
       <pose frame=''>0.21415 -0.916385 0 0 -0 0</pose>
     </model>
-    <model name='biscuits'>
-      <link name='biscuits_link'>
-        <inertial>
-          <pose frame=''>0 0 0 0 -0 0</pose>
-          <mass>0.1</mass>
-          <inertia>
-            <ixx>1</ixx>
-            <ixy>0</ixy>
-            <ixz>0</ixz>
-            <iyy>1</iyy>
-            <iyz>0</iyz>
-            <izz>1</izz>
-          </inertia>
-        </inertial>
-        <visual name='biscuits_visual'>
-          <pose frame=''>0 0 0 0 -0 0</pose>
-          <material>
-            <script>
-              <uri>model://biscuits/materials/scripts</uri>
-              <uri>model://biscuits/materials/textures</uri>
-              <name>biscuits</name>
-            </script>
-          </material>
-          <geometry>
-            <mesh>
-              <uri>model://biscuits/meshes/biscuits.dae</uri>
-            </mesh>
-          </geometry>
-        </visual>
-        <collision name='biscuits_collision'>
-          <pose frame=''>0.015 0.01 0.075 0 -0 2.2</pose>
-          <geometry>
-            <box>
-              <size>0.19 0.06 0.15</size>
-            </box>
-          </geometry>
-          <max_contacts>10</max_contacts>
-          <surface>
-            <friction>
-              <ode mu="1.0" mu2="1.0" fdir1="0 0 0" slip1="0" slip2="0"/>
-            </friction>
-            <bounce restitution_coefficient="0" threshold="1e+6"/>
-            <contact>
-              <ode soft_cfm="0" soft_erp="0.2" kp="1e+10" kd="1" max_vel="1.0" min_depth="1e-4"/>
-            </contact>
-          </surface>
-        </collision>
-        <self_collide>0</self_collide>
-        <kinematic>0</kinematic>
-      </link>
-      <pose frame=''>0.266598 0.321459 0 0 -0 0</pose>
-    </model>
     <model name='book'>
       <link name='book_link'>
         <inertial>
@@ -863,7 +811,7 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <contact>
+             <contact>
               <ode/>
             </contact>
             <bounce/>
@@ -916,17 +864,17 @@
               <size>0.14 0.065 0.1</size>
             </box>
           </geometry>
-          <max_contacts>10</max_contacts>
+          <max_contacts>20</max_contacts>
           <surface>
-            <contact>
-              <ode/>
+             <contact>
+              <ode max_vel="100.0" min_depth="1e-4"/>
             </contact>
             <bounce/>
             <friction>
               <torsional>
                 <ode/>
               </torsional>
-              <ode/>
+              <ode mu="20.0" mu2="20.0" fdir1="0 0 1"/>
             </friction>
           </surface>
         </collision>
@@ -973,16 +921,13 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <contact>
-              <ode/>
-            </contact>
-            <bounce/>
             <friction>
-              <torsional>
-                <ode/>
-              </torsional>
-              <ode/>
+              <ode mu="20.0" mu2="20.0" fdir1="0 0 1"/>
             </friction>
+            <bounce/>
+            <contact>
+              <ode max_vel="100.0" min_depth="1e-4"/>
+            </contact>
           </surface>
         </collision>
         <self_collide>0</self_collide>
@@ -1028,16 +973,13 @@
           </geometry>
           <max_contacts>10</max_contacts>
           <surface>
-            <contact>
-              <ode/>
-            </contact>
-            <bounce/>
             <friction>
-              <torsional>
-                <ode/>
-              </torsional>
-              <ode/>
+              <ode mu="10.0" mu2="10.0" fdir1="0 0 1"/>
             </friction>
+            <bounce restitution_coefficient="0" threshold="1e+6"/>
+            <contact>
+              <ode kd="1.0" max_vel="100.0" min_depth="1e-4"/>
+            </contact>
           </surface>
         </collision>
         <self_collide>0</self_collide>
@@ -1084,14 +1026,14 @@
           <max_contacts>10</max_contacts>
           <surface>
             <contact>
-              <ode/>
+              <ode max_vel="100.0" min_depth="1e-4"/>
             </contact>
             <bounce/>
             <friction>
               <torsional>
                 <ode/>
               </torsional>
-              <ode/>
+              <ode mu="10.0" mu2="10.0" fdir1="0 0 1"/>
             </friction>
           </surface>
         </collision>
@@ -1136,7 +1078,7 @@
               <size>0.165 0.06 0.235</size>
             </box>
           </geometry>
-          <max_contacts>10</max_contacts>
+          <max_contacts>20</max_contacts>
           <surface>
             <contact>
               <ode/>
@@ -1146,7 +1088,7 @@
               <torsional>
                 <ode/>
               </torsional>
-              <ode/>
+              <ode mu="1.0" mu2="1.0" fdir1="0 0 1"/>
             </friction>
           </surface>
         </collision>
@@ -1154,6 +1096,58 @@
         <kinematic>0</kinematic>
       </link>
       <pose frame=''>0.503163 -0.426595 0 0 -0 0</pose>
+    </model>
+    <model name='biscuits'>
+      <link name='biscuits_link'>
+        <inertial>
+          <pose frame=''>0 0 0 0 -0 0</pose>
+          <mass>0.1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <visual name='biscuits_visual'>
+          <pose frame=''>0 0 0 0 -0 0</pose>
+          <material>
+            <script>
+              <uri>model://biscuits/materials/scripts</uri>
+              <uri>model://biscuits/materials/textures</uri>
+              <name>biscuits</name>
+            </script>
+          </material>
+          <geometry>
+            <mesh>
+              <uri>model://biscuits/meshes/biscuits.dae</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name='biscuits_collision'>
+          <pose frame=''>0.015 0.01 0.075 0 -0 2.2</pose>
+          <geometry>
+            <box>
+              <size>0.19 0.06 0.15</size>
+            </box>
+          </geometry>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <friction>
+              <ode mu="1.0" mu2="1.0" fdir1="0 0 1"/>
+            </friction>
+            <bounce restitution_coefficient="0" threshold="1e+6"/>
+            <contact>
+              <ode/>
+            </contact>
+          </surface>
+        </collision>
+        <self_collide>0</self_collide>
+        <kinematic>0</kinematic>
+      </link>
+      <pose frame=''>0.266598 0.321459 0 0 -0 0</pose>
     </model>
   </world>
 </sdf>

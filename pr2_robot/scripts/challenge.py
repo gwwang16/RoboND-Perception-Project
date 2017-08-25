@@ -204,7 +204,7 @@ def pcl_filtering(pcl_msg):
     detected_objects_pub.publish(detected_objects)
     detected_objects_all_pub.publish(detected_objects_all)
 
-    return detected_objects_all, collision_point
+    return detected_objects, collision_point
 
 def pr2_mov(rad):
     '''move pr2 world joint to desired angle (rad)'''
@@ -252,7 +252,6 @@ def pcl_callback(pcl_msg):
 
     detected_objects, collision_point = pcl_filtering(pcl_msg)
     
-
     # Suggested location for where to invoke your pr2_mover() function within pcl_callback()
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
@@ -289,7 +288,8 @@ def pr2_mover(object_list, collision_point=None):
     dropbox_param = rospy.get_param('/dropbox')   
 
     # Loop through the pick list
-    target_count = 0
+    target_count_left = 0
+    target_count_right = 0
     for target in object_list:
         
         labels.append(target.label)
@@ -301,6 +301,7 @@ def pr2_mover(object_list, collision_point=None):
         centroids.append(pick_position[:3])
 
         object_name.data = str(target.label)
+        
 
         # Assign the arm and 'place_pose' to be used for pick_place
         for index in range(0, len(object_list_param)):
@@ -311,8 +312,12 @@ def pr2_mover(object_list, collision_point=None):
                 arm_name.data = dropbox_param[ii]['name']
                 dropbox_position = dropbox_param[ii]['position']
                 dropbox_x = -0.1 #dropbox_position[0]
-                dropbox_y = dropbox_position[1] - 0.1 + target_count*0.04
-                dropbox_z = dropbox_position[2]
+                # Add olace pose bias for each object
+                if arm_name.data == 'right':
+                    dropbox_y = dropbox_position[1] - 0.10 + target_count_right*0.1                  
+                else:
+                    dropbox_y = dropbox_position[1] - 0.10 + target_count_left*0.03
+                dropbox_z = dropbox_position[2] + 0.1
                 place_pose.position.x = np.float(dropbox_x)
                 place_pose.position.y = np.float(dropbox_y)
                 place_pose.position.z = np.float(dropbox_z)            
@@ -320,7 +325,6 @@ def pr2_mover(object_list, collision_point=None):
         # Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
         yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
         dict_list.append(yaml_dict)
-        target_count += 1
 
         # if use_collision_map:
         #     # Delete the target clound from collision map
@@ -336,17 +340,22 @@ def pr2_mover(object_list, collision_point=None):
         #     collision_point_pub.publish(pcl_to_ros(collision_cloud))
         #     rospy.sleep(2)
 
-
         # Wait for 'pick_place_routine' service to come up
         print("Target now: ", target.label)
         rospy.wait_for_service('pick_place_routine')
-
         try:
             pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
-
             # Insert message variables to be sent as a service request   
             resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
             print ("Response: ",resp.success)
+            # Count number to set bias value for the object arrangement
+            if resp.success:
+                if arm_name.data == 'right':
+                    target_count_right += 1
+                    if target_count_right == 3:
+                        target_count_right = 0.5
+                else:
+                    target_count_left += 1
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
