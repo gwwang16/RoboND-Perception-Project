@@ -12,7 +12,6 @@ from visualization_msgs.msg import Marker
 from sensor_stick.marker_tools import *
 from sensor_stick.msg import DetectedObjectsArray
 from sensor_stick.msg import DetectedObject
-from sensor_msgs.msg import JointState
 from sensor_stick.pcl_helper import *
 
 import rospy
@@ -47,7 +46,8 @@ def send_to_yaml(yaml_filename, dict_list):
     with open(yaml_filename, 'w') as outfile:
         yaml.dump(data_dict, outfile, default_flow_style=False)
 
-def pcl_filtering(pcl_msg):
+def pcl_callback(pcl_msg):
+    '''Callback function for your Point Cloud Subscriber'''
     ###### Exercise-2 TODOs: #####
     # Convert ROS msg to PCL data
     cloud = ros_to_pcl(pcl_msg)
@@ -152,15 +152,12 @@ def pcl_filtering(pcl_msg):
     # Create collision point
     collision_point = {}
     collision_point["table"] = cloud_table.to_array()
-    collision_point_pub.publish(ros_pcl_table)
 
     # Exercise-3 TODOs:
+
     # Classify the clusters! (loop through each detected cluster one at a time)
-    detected_objects_labels_all = []
-    detected_objects_all = []
     detected_objects_labels = []
     detected_objects = []
-    
     for index, pts_list in enumerate(cluster_indices):
         # Grab the points for the cluster
         pcl_cluster = cloud_objects.extract(pts_list)
@@ -191,73 +188,17 @@ def pcl_filtering(pcl_msg):
         # Add the detected object to the collision map
         # collision_point[label] = pcl_cluster.to_array()
 
-        if not any(item.label == label for item in detected_objects_all):
-        # for x in detected_objects_all:
-        #     if label in x.label:
-            detected_objects_all.append(do)
-            detected_objects_labels_all.append(label)
-
     rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
-    rospy.loginfo('All detected {} objects: {}'.format(len(detected_objects_labels_all), detected_objects_labels_all))
+
 
     # Publish the list of detected objects
     detected_objects_pub.publish(detected_objects)
-    detected_objects_all_pub.publish(detected_objects_all)
 
-    return detected_objects, collision_point
-
-def pr2_mov(rad):
-    '''move pr2 world joint to desired angle (rad)'''
-    rate = rospy.Rate(50) # 50hz
-    world_joint_pub.publish(rad)
-    rate.sleep()
-
-    joint_state = rospy.wait_for_message('/pr2/joint_states', JointState)
-
-    return joint_state.position[19]
-
-def pr2_rot():
-    ''' rotate pr2 right and left to detect environment'''
-    global rotation_state
-    global rot_dir
-
-    if rotation_state:
-        if rot_dir == 'left':
-            world_joint_state = pr2_mov(1.57)
-            if np.abs(world_joint_state - 1.57) < 0.1:                
-                rot_dir = 'right'
-                print("Get left side, go to right side now...")
-
-        if rot_dir == 'right':
-            world_joint_state = pr2_mov(-1.57)
-            if np.abs(world_joint_state + 1.57) < 0.1:                
-                rot_dir = 'center'
-                print("Get right side, go to center now...")
-
-        if rot_dir == 'center':
-            world_joint_state = pr2_mov(0)
-            if np.abs(world_joint_state) < 0.1:                
-                rotation_state = False
-                print("Get center, exist rotation.")
-            
-def pcl_callback(pcl_msg):
-    '''Callback function for your Point Cloud Subscriber'''
-    
-    # Rotate PR2 in place to capture side tables for the collision map
-    collision_map = False
-    if collision_map:
-        pr2_rot()
-    else:
-        world_joint_state = pr2_mov(0)
-
-    detected_objects, collision_point = pcl_filtering(pcl_msg)
-    
     # Suggested location for where to invoke your pr2_mover() function within pcl_callback()
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        if len(detected_objects) > 0:
-            pr2_mover(detected_objects, collision_point)
+        pr2_mover(detected_objects, collision_point)
     except rospy.ROSInterruptException:
         pass
 
@@ -265,8 +206,6 @@ def pcl_callback(pcl_msg):
 def pr2_mover(object_list, collision_point=None):
     '''function to load parameters and request PickPlace service'''
     # Initialize variables
-    global use_collision_map
-
     dict_list = []
     labels = []
     centroids = []
@@ -281,15 +220,15 @@ def pr2_mover(object_list, collision_point=None):
     pick_pose = Pose()
     place_pose = Pose()
 
-    test_scene_num.data = 3    
+    test_scene_num.data = 1    
 
     # Read yaml parameters
     object_list_param = rospy.get_param('/object_list')
-    dropbox_param = rospy.get_param('/dropbox')   
-
+    dropbox_param = rospy.get_param('/dropbox')
+ 
+    # TODO: Rotate PR2 in place to capture side tables for the collision map
+    
     # Loop through the pick list
-    target_count_left = 0
-    target_count_right = 0
     for target in object_list:
         
         labels.append(target.label)
@@ -301,7 +240,6 @@ def pr2_mover(object_list, collision_point=None):
         centroids.append(pick_position[:3])
 
         object_name.data = str(target.label)
-        
 
         # Assign the arm and 'place_pose' to be used for pick_place
         for index in range(0, len(object_list_param)):
@@ -311,13 +249,9 @@ def pr2_mover(object_list, collision_point=None):
             if dropbox_param[ii]['group'] == object_group:
                 arm_name.data = dropbox_param[ii]['name']
                 dropbox_position = dropbox_param[ii]['position']
-                dropbox_x = -0.1 #dropbox_position[0]
-                # Add olace pose bias for each object
-                if arm_name.data == 'right':
-                    dropbox_y = dropbox_position[1] - 0.10 + target_count_right*0.1                  
-                else:
-                    dropbox_y = dropbox_position[1] - 0.10 + target_count_left*0.03
-                dropbox_z = dropbox_position[2] + 0.1
+                dropbox_x = dropbox_position[0]
+                dropbox_y = dropbox_position[1]
+                dropbox_z = dropbox_position[2]
                 place_pose.position.x = np.float(dropbox_x)
                 place_pose.position.y = np.float(dropbox_y)
                 place_pose.position.z = np.float(dropbox_z)            
@@ -326,62 +260,51 @@ def pr2_mover(object_list, collision_point=None):
         yaml_dict = make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose)
         dict_list.append(yaml_dict)
 
-        # if use_collision_map:
-        #     # Delete the target clound from collision map
-        #     del collision_point[target.label]
 
-        #     # Creating collision map
-        #     points_list = np.empty((0,4), float)
-        #     for index, target_pts in collision_point.iteritems():
-        #         points_list = np.append(points_list, target_pts[:,:4], axis=0)
+        # Delete the target clound from collision map
+        
+        del collision_point[target.label]
 
-        #     collision_cloud = pcl.PointCloud_PointXYZRGB()
-        #     collision_cloud.from_list(np.ndarray.tolist(points_list))
-        #     collision_point_pub.publish(pcl_to_ros(collision_cloud))
-        #     rospy.sleep(2)
+        # Creating collision map
+        points_list = np.empty((0,4), float)
+        for index, target_pts in collision_point.iteritems():
+            points_list = np.append(points_list, target_pts[:,:4], axis=0)
+
+        collision_cloud = pcl.PointCloud_PointXYZRGB()
+        collision_cloud.from_list(np.ndarray.tolist(points_list))
+        collision_point_pub.publish(pcl_to_ros(collision_cloud))
+
 
         # Wait for 'pick_place_routine' service to come up
-        print("Target now: ", target.label)
-        rospy.wait_for_service('pick_place_routine')
-        try:
-            pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
-            # Insert message variables to be sent as a service request   
-            resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-            print ("Response: ",resp.success)
-            # Count number to set bias value for the object arrangement
-            if resp.success:
-                if arm_name.data == 'right':
-                    target_count_right += 1
-                    if target_count_right == 3:
-                        target_count_right = 0.5
-                else:
-                    target_count_left += 1
+        # print("Target now: ", target.label)
+        # rospy.wait_for_service('pick_place_routine')
 
-        except rospy.ServiceException, e:
-            print "Service call failed: %s"%e
+        # try:
+        #     pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
+
+        #     # Insert message variables to be sent as a service request   
+        #     resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
+        #     print ("Response: ",resp.success)
+
+        # except rospy.ServiceException, e:
+        #     print "Service call failed: %s"%e
 
     # Output request parameters into output yaml file  
     yaml_filename = 'output_' + str(test_scene_num.data) + '.yaml'
     if not os.path.exists(yaml_filename):
         send_to_yaml(yaml_filename, dict_list)
         print(yaml_filename + "has been saved.")
-    # else:
-    #     print(yaml_filename + "has been existed.")
+    else:
+        print(yaml_filename + "has been existed.")
 
 
 if __name__ == '__main__':
-    # Initial global variables
-    rotation_state = True
-    world_joint_state = 0
-    rot_dir = 'left'
-    use_collision_map = True
 
     # ROS node initialization
     rospy.init_node('perception_project', anonymous=True)
 
     # Create Subscribers
     pcl_sub = rospy.Subscriber("/pr2/world/points", pc2.PointCloud2, pcl_callback, queue_size=1)
-    # joint_sub = rospy.Subscriber("/joint_state", JointState, state_callback, queue_size=1)
 
     # Create Publishers
     pcl_objects_pub = rospy.Publisher("/pcl_objects", PointCloud2, queue_size=1)
@@ -390,7 +313,6 @@ if __name__ == '__main__':
     
     object_markers_pub = rospy.Publisher("/object_markers", Marker, queue_size=1)
     detected_objects_pub = rospy.Publisher("/detected_objects", DetectedObjectsArray, queue_size=1)
-    detected_objects_all_pub = rospy.Publisher("/detected_objects_all", DetectedObjectsArray, queue_size=1)
 
     collision_point_pub = rospy.Publisher("/pr2/3d_map/points", PointCloud2, queue_size=1)
 
