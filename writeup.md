@@ -309,13 +309,165 @@
 
 - Object recognition results
 
+  all objects in `pick_list_*.yaml` are correctly recognized, as shown in following. The `yaml` file can be found in (/output) folder.
+
 ![alt text][pick_list_1]
 ![alt text][pick_list_2]
 ![alt text][pick_list_3]
 
 ### Extra Challenges: 
+
+#### 1. I created a collision map and published a point cloud to the `/pr2/3d_map/points` topic, changed the `point_cloud_topic` to `/pr2/3d_map/points` in `sensors.yaml` in the `/pr2_robot/config/` directory. 
+
+- To generate collision map, I built a dictionary and stored table cloud it firstly. 
+```
+ 	# Create collision point
+    collision_point = {}
+    collision_point["table"] = cloud_table.to_array()
+```
+   -  Then I stored each object into the dictionary.
+
+```
+	# Add the detected object to the collision map
+    # collision_point[label] = pcl_cluster.to_array()
+```
+   -  Delete the current object from collision map during picking them, publish the collision map again.
+```
+    # Delete the target clound from collision map
+    del collision_point[target.label]
+    # Creating collision map
+    points_list = np.empty((0,4), float)
+    for index, target_pts in collision_point.iteritems():
+          points_list = np.append(points_list, target_pts[:,:4], axis=0)
+    collision_cloud = pcl.PointCloud_PointXYZRGB()
+    collision_cloud.from_list(np.ndarray.tolist(points_list))
+    collision_point_pub.publish(pcl_to_ros(collision_cloud))
+```
+However, I failed to do this. My collision map cannot be updated once it was published, so I gave it up and used table cloud as collision map only. The consequence is the gripper would hit other objects during grasping one. So I increased a bit drop position height to avoid this problem.
+
+```
+# Create collision point
+    collision_point = {}
+    collision_point["table"] = cloud_table.to_array()
+    collision_point_pub.publish(ros_pcl_table)
+```
+
+#### 2. I built `pr2_rot()` to rotate the robot and then back to its initial position. However, I didn't try the `challenge.world` and my collision map has problem of updating, this function didn't used.
+
+```
+def pr2_mov(rad):
+    '''move pr2 world joint to desired angle (rad)'''
+    rate = rospy.Rate(50) # 50hz
+    world_joint_pub.publish(rad)
+    rate.sleep()
+
+    joint_state = rospy.wait_for_message('/pr2/joint_states', JointState)
+
+    return joint_state.position[19]
+
+def pr2_rot():
+    ''' rotate pr2 right and left to detect environment'''
+    global rotation_state
+    global rot_dir
+
+    if rotation_state:
+        if rot_dir == 'left':
+            world_joint_state = pr2_mov(1.57)
+            if np.abs(world_joint_state - 1.57) < 0.1:                
+                rot_dir = 'right'
+                print("Get left side, go to right side now...")
+
+        if rot_dir == 'right':
+            world_joint_state = pr2_mov(-1.57)
+            if np.abs(world_joint_state + 1.57) < 0.1:                
+                rot_dir = 'center'
+                print("Get right side, go to center now...")
+
+        if rot_dir == 'center':
+            world_joint_state = pr2_mov(0)
+            if np.abs(world_joint_state) < 0.1:                
+                rotation_state = False
+                print("Get center, exist rotation.")
+```
+
+#### 3. There are some problems about objects grasping. To solve this problem, I added fraction coefficients for each item in`test1-3.world` (/pr2_robot/worlds), advised by douglasteeple in slack, a piece of code for example,
+
+   ```<model name='snacks'>
+           <collision name='snacks_collision'>
+             <pose frame=''>0.04 0.02 0.117 0 -0 2.1</pose>
+             <geometry>
+               ...
+             </geometry>
+             <max_contacts>10</max_contacts>
+             <surface>
+               <contact>
+                 <ode/>
+               </contact>
+               <bounce/>
+               <friction>
+                 <torsional>
+                   <ode/>
+                 </torsional>
+                 <ode mu="1.0" mu2="1.0" fdir1="0 0 1"/>
+               </friction>
+             </surface>
+           </collision>
+           ...
+       </model>
+   ```
+   where, `mu` and `mu2` are friction coefficients, `fdir1` is friction direction vector (so I set [0 0 1] here), but it is useful only if `dContactFDir1` flag is set in `surface.mode`. I know nothing about c/c++, so I don't know whether it is effective here. `soap` is very slippery, I didn't find the reason, so used a quite large `mu` 500 for it, but it still cannot be grasped sometime.
+   Moreover, I increased `kp` of pid controller params for gripper from 100 to 200-500 (/pr2\_robot/config/controllers.yaml), and increased gripper velocity a little bit from 0.05 to 0.1 (/pr2\_moveit/config/joint_limits.yaml).
+   Reference:
+   http://gazebosim.org/tutorials/?tut=ros_urdf
+   http://www.ode.org/ode-latest-userguide.html#sec_7_3_7
+
+   As for my collision map cannot be updated once it was published, so I used table cloud as collision map only. The consequence is the gripper would hit other objects during grasping one. So I increased a bit drop position height to avoid this problem. To arrange the picked objects, I added a bias in y axis for each drop position.
+
+```
+		# Assign the arm and 'place_pose' to be used for pick_place
+        for index in range(0, len(object_list_param)):
+            if object_list_param[index]['name'] == target.label:
+                object_group = object_list_param[index]['group']
+        for ii in range(0, len(dropbox_param)):
+            if dropbox_param[ii]['group'] == object_group:
+                arm_name.data = dropbox_param[ii]['name']
+                dropbox_position = dropbox_param[ii]['position']
+                dropbox_x = -0.1 #dropbox_position[0]
+                # Add olace pose bias for each object
+                if arm_name.data == 'right':
+                    dropbox_y = dropbox_position[1] - 0.10 + target_count_right*0.1             
+                else:
+                    dropbox_y = dropbox_position[1] - 0.10 + target_count_left*0.03
+                dropbox_z = dropbox_position[2] + 0.1
+                place_pose.position.x = np.float(dropbox_x)
+                place_pose.position.y = np.float(dropbox_y)
+                place_pose.position.z = np.float(dropbox_z)           
+```
+
+```
+			if resp.success:
+                if arm_name.data == 'right':
+                    target_count_right += 1
+                    if target_count_right == 3:
+                        target_count_right = 0.5
+                else:
+                    target_count_left += 1
+```
+
+
+
+#### 4. All three pick lists are tested with my code shown above, and all objects are placed into their respective drop box. Results are the following.
+
 ![alt text][pick_list_1_result]
 
 ![alt text][pick_list_2_result]
 
 ![alt text][pick_list_3_result]
+
+### Further Improvement
+
+Most of time is spent on restarting simulator, it's really time consuming! And it is probabilistic on catching objects even for the same setting. So I didn't spend much time on how to make sure the gripper can grasp objects tightly.
+
+The collision map needs to be investigated more to contain objects in real time. I'd like to do it and explore in `challenge.world` if there is improvement of this project simulator in future.
+
+The path planning from Moveit! is not desirable, the arm's movement is quite slow and unsteady as well.  All of these can be improved further.
