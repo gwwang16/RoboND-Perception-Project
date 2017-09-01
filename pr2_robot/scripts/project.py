@@ -2,7 +2,7 @@
 
 # Import modules
 import numpy as np
-import sklearn
+# import sklearn
 from sklearn.preprocessing import LabelEncoder
 import pickle
 from sensor_stick.srv import GetNormals
@@ -16,7 +16,7 @@ from sensor_msgs.msg import JointState
 from sensor_stick.pcl_helper import *
 
 import rospy
-import tf
+# import tf
 from geometry_msgs.msg import Pose
 from std_msgs.msg import Float64
 from std_msgs.msg import Int32
@@ -28,20 +28,23 @@ from rospy_message_converter import message_converter
 import yaml
 import os
 
+
 def get_normals(cloud):
     '''Helper function to get surface normals'''
     get_normals_prox = rospy.ServiceProxy('/feature_extractor/get_normals', GetNormals)
     return get_normals_prox(cloud).cluster
 
+
 def make_yaml_dict(test_scene_num, arm_name, object_name, pick_pose, place_pose):
     '''Helper function to create a yaml friendly dictionary from ROS messages'''
     yaml_dict = {}
     yaml_dict["test_scene_num"] = test_scene_num.data
-    yaml_dict["arm_name"]  = arm_name.data
+    yaml_dict["arm_name"] = arm_name.data
     yaml_dict["object_name"] = object_name.data
     yaml_dict["pick_pose"] = message_converter.convert_ros_message_to_dictionary(pick_pose)
     yaml_dict["place_pose"] = message_converter.convert_ros_message_to_dictionary(place_pose)
     return yaml_dict
+
 
 def send_to_yaml(yaml_filename, dict_list):
     '''Helper function to output to yaml file'''
@@ -49,8 +52,9 @@ def send_to_yaml(yaml_filename, dict_list):
     with open(yaml_filename, 'w') as outfile:
         yaml.dump(data_dict, outfile, default_flow_style=False)
 
+
 def pcl_filtering(pcl_msg):
-    ###### Exercise-2 TODOs: #####
+    # Exercise-2 TODOs: #
     # Convert ROS msg to PCL data
     cloud = ros_to_pcl(pcl_msg)
 
@@ -176,14 +180,14 @@ def pcl_filtering(pcl_msg):
         feature = np.concatenate((chists, nhists[:1]))
 
         # Make the prediction
-        prediction = clf.predict(scaler.transform(feature.reshape(1,-1)))
+        prediction = clf.predict(scaler.transform(feature.reshape(1, -1)))
         label = encoder.inverse_transform(prediction)[0]
         detected_objects_labels.append(label)
 
         # Publish a label into RViz
         label_pos = list(white_cloud[pts_list[0]])
         label_pos[2] += .4
-        object_markers_pub.publish(make_label(label,label_pos, index))
+        object_markers_pub.publish(make_label(label, label_pos, index))
 
         # Add the detected object to the list of detected objects.
         do = DetectedObject()
@@ -194,8 +198,8 @@ def pcl_filtering(pcl_msg):
         collision_point[label] = pcl_cluster.to_array()
 
         if not any(item.label == label for item in detected_objects_all):
-        # for x in detected_objects_all:
-        #     if label in x.label:
+            # for x in detected_objects_all:
+            #     if label in x.label:
             detected_objects_all.append(do)
             detected_objects_labels_all.append(label)
 
@@ -208,15 +212,17 @@ def pcl_filtering(pcl_msg):
 
     return detected_objects, collision_point
 
+
 def pr2_mov(rad):
     '''move pr2 world joint to desired angle (rad)'''
-    rate = rospy.Rate(50) # 50hz
+    rate = rospy.Rate(50)  # 50hz
     world_joint_pub.publish(rad)
     rate.sleep()
 
     joint_state = rospy.wait_for_message('/pr2/joint_states', JointState)
 
     return joint_state.position[19]
+
 
 def pr2_rot():
     ''' rotate pr2 right and left to detect environment'''
@@ -242,6 +248,7 @@ def pr2_rot():
                 rotation_state = False
                 print("Get center, exist rotation.")
 
+
 def pcl_callback(pcl_msg):
     '''Callback function for your Point Cloud Subscriber'''
 
@@ -250,7 +257,7 @@ def pcl_callback(pcl_msg):
     if collision_map:
         pr2_rot()
     else:
-        world_joint_state = pr2_mov(0)
+        pr2_mov(0)
 
     detected_objects, collision_point = pcl_filtering(pcl_msg)
 
@@ -304,7 +311,6 @@ def pr2_mover(object_list, collision_point=None):
 
         object_name.data = str(target.label)
 
-
         # Assign the arm and 'place_pose' to be used for pick_place
         for index in range(0, len(object_list_param)):
             if object_list_param[index]['name'] == target.label:
@@ -313,12 +319,12 @@ def pr2_mover(object_list, collision_point=None):
             if dropbox_param[ii]['group'] == object_group:
                 arm_name.data = dropbox_param[ii]['name']
                 dropbox_position = dropbox_param[ii]['position']
-                dropbox_x = -0.1 #dropbox_position[0]
+                dropbox_x = -0.1  # dropbox_position[0]
                 # Add olace pose bias for each object
                 if arm_name.data == 'right':
-                    dropbox_y = dropbox_position[1] - 0.10 + target_count_right*0.1
+                    dropbox_y = dropbox_position[1] - 0.10 + target_count_right * 0.1
                 else:
-                    dropbox_y = dropbox_position[1] - 0.10 + target_count_left*0.03
+                    dropbox_y = dropbox_position[1] - 0.10 + target_count_left * 0.03
                 dropbox_z = dropbox_position[2] + 0.1
                 place_pose.position.x = np.float(dropbox_x)
                 place_pose.position.y = np.float(dropbox_y)
@@ -334,28 +340,28 @@ def pr2_mover(object_list, collision_point=None):
                 collision_map_prox = rospy.ServiceProxy('/clear_octomap', Empty())
                 resp = collision_map_prox()
             except rospy.ServiceException, e:
-                print "Service call failed: %s"%e
+                print "Service call failed: %s" % e
 
-	      	# Delete the target clound from collision map
+                # Delete the target clound from collision map
             del collision_point[target.label]
 
             # Creating collision map
-            points_list = np.empty((0,4), float)
+            points_list = np.empty((0, 4), float)
             for index, target_pts in collision_point.iteritems():
-                points_list = np.append(points_list, target_pts[:,:4], axis=0)
+                points_list = np.append(points_list, target_pts[:, :4], axis=0)
 
             collision_cloud = pcl.PointCloud_PointXYZRGB()
             collision_cloud.from_list(np.ndarray.tolist(points_list))
             collision_point_pub.publish(pcl_to_ros(collision_cloud))
 
         # Wait for 'pick_place_routine' service to come up
-        print("Target now: ", target.label)
+        print ("Target: ", target.label)
         rospy.wait_for_service('pick_place_routine')
         try:
             pick_place_routine = rospy.ServiceProxy('pick_place_routine', PickPlace)
             # Insert message variables to be sent as a service request
             resp = pick_place_routine(test_scene_num, object_name, arm_name, pick_pose, place_pose)
-            print ("Response: ",resp.success)
+            print ("Complete: ", resp.success)
             # Count number to set bias value for the object arrangement
             if resp.success:
                 if arm_name.data == 'right':
@@ -366,7 +372,7 @@ def pr2_mover(object_list, collision_point=None):
                     target_count_left += 1
 
         except rospy.ServiceException, e:
-            print "Service call failed: %s"%e
+            print "Service call failed: %s" % e
 
     # Output request parameters into output yaml file
     yaml_filename = 'output_' + str(test_scene_num.data) + '.yaml'
