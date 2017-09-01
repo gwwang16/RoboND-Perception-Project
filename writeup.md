@@ -32,6 +32,7 @@
 [pick_list_2_result]: ./pictures/pick_list_2_result.jpg
 [pick_list_3]: ./pictures/pick_list_3.jpg
 [pick_list_3_result]: ./pictures/pick_list_3_result.jpg
+[collision_map]: ./pictures/collision_map.png
 
 
 ## [Rubric](https://review.udacity.com/#!/rubrics/1067/view) Points
@@ -331,6 +332,17 @@
 	# Add the detected object to the collision map
     # collision_point[label] = pcl_cluster.to_array()
 ```
+- To update the collision map, we need clear the collision map before publishing.  As advised by @chedanix in slack, first calling `rostopic info /pr2/3d_map/points` and followed by `rosnode info /move_group`, we can find `/clear_octomap` service.
+```
+from std_srvs.srv import Empty
+rospy.wait_for_service('/clear_octomap')
+try:
+    collision_map_prox = rospy.ServiceProxy('/clear_octomap', Empty())
+    resp = collision_map_prox()
+except rospy.ServiceException, e:
+    print "Service call failed: %s" % e
+```
+
    -  Delete the current object from collision map during picking them, publish the collision map again.
 ```
     # Delete the target clound from collision map
@@ -343,14 +355,8 @@
     collision_cloud.from_list(np.ndarray.tolist(points_list))
     collision_point_pub.publish(pcl_to_ros(collision_cloud))
 ```
-However, I failed to do this. My collision map cannot be updated once it was published, so I gave it up and used table cloud as collision map only. The consequence is the gripper would hit other objects during grasping one. So I increased a bit drop position height to avoid this problem.
-
-```
-# Create collision point
-    collision_point = {}
-    collision_point["table"] = cloud_table.to_array()
-    collision_point_pub.publish(ros_pcl_table)
-```
+The collision map looks like the following
+![alt text][collision_map]
 
 #### 2. I built `pr2_rot()` to rotate the robot and then back to its initial position. However, I didn't try the `challenge.world` and my collision map has problem of updating, this function didn't used.
 
