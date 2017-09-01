@@ -80,6 +80,7 @@ Close all active terminal windows using **ctrl+c** before restarting the demo.
 You can launch the project scenario like this:
 ```sh
 $ roslaunch pr2_robot pick_place_project.launch
+$ rosrun pr2_robot project_template.py
 ```
 # Required Steps for a Passing Submission:
 1. Extract features and train an SVM model on new objects (see `pick_list_*.yaml` in `/pr2_robot/config/` for the list of models you'll be trying to identify). 
